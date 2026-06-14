@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & discussions
+    url: https://github.com/undoverse-in/undoverse/discussions
+    about: Ask questions, share ideas, and talk with the community here.
+  - name: Security disclosure
+    url: mailto:security@undoverse.in
+    about: Please report security vulnerabilities privately, not as public issues.

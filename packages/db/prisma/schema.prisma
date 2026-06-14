@@ -1,0 +1,195 @@
+// undoverse — Prisma schema
+// Neon serverless PostgreSQL. Pooled URL at runtime, direct URL for migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Enums
+// ─────────────────────────────────────────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  UPCOMING
+  ARCHIVED
+}
+
+enum BuilderRole {
+  BUILDER
+  MAINTAINER
+  CONTRIBUTOR
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Core models
+// ─────────────────────────────────────────────────────────────
+
+/// A person in the undoverse — almost always a GitHub-authed builder.
+model User {
+  id          String   @id @default(cuid())
+  githubId    String?  @unique
+  username    String   @unique // GitHub handle; also their /builders/:username
+  displayName String
+  avatarUrl   String?
+  bio         String?
+  email       String?  @unique
+
+  // Support rails — opt-in, shown on the builder profile when set.
+  upiId      String?
+  walletAddr String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects    ProjectBuilder[]
+  upvotes     Upvote[]
+  submissions Submission[]     @relation("Submitter")
+
+  // Auth.js adapter relations
+  accounts Account[]
+  sessions Session[]
+
+  @@index([username])
+}
+
+/// A live (or upcoming/archived) site in the ecosystem.
+model Project {
+  id          String        @id @default(cuid())
+  slug        String        @unique // url + lookup key, e.g. "kuzhiundo"
+  name        String
+  tagline     String
+  description String        @db.Text
+  repoUrl     String?
+  demoUrl     String?
+  subdomain   String        @unique // resolves <subdomain>.undoverse.in
+  status      ProjectStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  builders   ProjectBuilder[]
+  upvotes    Upvote[]
+  changelogs ChangeLog[]
+
+  @@index([status])
+  @@index([slug])
+}
+
+/// Join table: who built what, and in what capacity.
+model ProjectBuilder {
+  projectId String
+  userId    String
+  role      BuilderRole @default(BUILDER)
+
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+/// One upvote per user per project (the unique constraint enforces it).
+model Upvote {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+/// A proposed project awaiting human review (posted from /submit).
+model Submission {
+  id          String           @id @default(cuid())
+  submitterId String?
+  projectName String
+  tagline     String
+  conceptUrl  String?
+  repoUrl     String?
+  status      SubmissionStatus @default(PENDING)
+  reviewNote  String?          @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submitter User? @relation("Submitter", fields: [submitterId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([submitterId])
+}
+
+/// Release notes for a project, shown on its detail page.
+model ChangeLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String   @db.Text
+  version     String
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Auth.js v5 adapter models (Prisma adapter)
+// ─────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

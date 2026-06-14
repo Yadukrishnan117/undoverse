@@ -1,0 +1,28 @@
+{
+  "name": "undoverse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "undoverse.in — the developer-creator economy hub for Kerala's undo ecosystem. Built by 72BPM, Trivandrum.",
+  "packageManager": "pnpm@9.1.0",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "start": "turbo run start",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @undoverse/db generate",
+    "db:push": "pnpm --filter @undoverse/db push",
+    "db:migrate": "pnpm --filter @undoverse/db migrate",
+    "db:studio": "pnpm --filter @undoverse/db studio",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.2",
+    "turbo": "^2.0.4",
+    "typescript": "^5.5.2"
+  }
+}

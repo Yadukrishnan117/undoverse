@@ -1,0 +1,174 @@
+name: PR Preview
+
+# Deploys an isolated Vercel preview for every pull request and runs
+# Lighthouse CI against it for performance and accessibility budgets.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  # One preview per PR; cancel the previous build when new commits land.
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+# The job needs to write PR comments and statuses.
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  preview:
+    name: Deploy Preview & Lighthouse
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @undoverse/db generate
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Pull Vercel environment (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build with Vercel
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        run: |
+          url="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})"
+          echo "preview-url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview deployed to $url"
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.preview-url }}';
+            const marker = '<!-- undoverse-preview -->';
+            const body = [
+              marker,
+              '### Preview deployment ready',
+              '',
+              `| | |`,
+              `|---|---|`,
+              `| Preview | ${url} |`,
+              `| Commit | \`${context.sha.substring(0, 7)}\` |`,
+              '',
+              'Lighthouse results will be posted below once the audit finishes.'
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Run Lighthouse CI
+        id: lhci
+        run: |
+          pnpm add -g @lhci/cli@0.13.x
+          lhci autorun \
+            --collect.url="${{ steps.deploy.outputs.preview-url }}" \
+            --collect.numberOfRuns=3 \
+            --upload.target=temporary-public-storage
+        continue-on-error: true
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Comment Lighthouse summary on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.lighthouseci';
+            let summary = 'Lighthouse results could not be parsed.';
+            try {
+              const files = fs.readdirSync(path).filter(f => f.endsWith('.json') && f.startsWith('lhr-'));
+              if (files.length) {
+                // Use the last run's report.
+                const lhr = JSON.parse(fs.readFileSync(`${path}/${files[files.length - 1]}`, 'utf8'));
+                const c = lhr.categories;
+                const pct = (v) => (v == null ? 'n/a' : Math.round(v * 100));
+                summary = [
+                  '| Category | Score |',
+                  '|---|---|',
+                  `| Performance | ${pct(c.performance?.score)} |`,
+                  `| Accessibility | ${pct(c.accessibility?.score)} |`,
+                  `| Best Practices | ${pct(c['best-practices']?.score)} |`,
+                  `| SEO | ${pct(c.seo?.score)} |`,
+                ].join('\n');
+              }
+            } catch (e) {
+              summary = `Lighthouse summary unavailable: ${e.message}`;
+            }
+
+            const marker = '<!-- undoverse-lighthouse -->';
+            const body = [marker, '### Lighthouse CI', '', summary].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(x => x.body && x.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
