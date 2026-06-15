@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
@@ -69,6 +70,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
