@@ -17,6 +17,10 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "undoverse.in";
 // Subdomains that should NOT be treated as a project slug.
 const RESERVED = new Set(["www", "app", "api", "admin", "assets", "cdn", "vercel"]);
 
+// Only allow slugs that are purely lowercase alphanumeric + hyphens, 2-40 chars.
+// Prevents path-traversal (e.g. "../etc") and injection via the Host header.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$|^[a-z0-9]{2,40}$/;
+
 function getSubdomain(host: string): string | null {
   // Strip the port (local dev: kuzhiundo.undoverse.localhost:3000)
   const hostname = host.split(":")[0].toLowerCase();
@@ -59,6 +63,11 @@ export function middleware(req: NextRequest) {
   // Apex domain or reserved subdomain → serve the app normally.
   if (!subdomain || RESERVED.has(subdomain)) {
     return NextResponse.next();
+  }
+
+  // Validate the slug before rewriting — block malformed / injection attempts.
+  if (!SLUG_RE.test(subdomain)) {
+    return new NextResponse("Not found", { status: 404 });
   }
 
   // A project subdomain. Rewrite to its detail page, preserving any deeper path.

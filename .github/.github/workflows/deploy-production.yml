@@ -1,0 +1,140 @@
+name: Deploy Production
+
+# Runs CI verification + creates a GitHub Release when commits land on `main`.
+# Vercel's native git integration handles the actual deployment automatically.
+# Once VERCEL_TOKEN + DB secrets are configured, add the Vercel CLI and
+# migration steps back from docs/DEPLOYMENT_RUNBOOK.md.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # needed to create releases and commit comments
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  verify-and-release:
+    name: Verify + Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for changelog
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @undoverse/db generate
+
+      - name: Build
+        run: pnpm turbo build --filter=@undoverse/web
+        env:
+          NEXT_PUBLIC_ROOT_DOMAIN: undoverse.in
+          NEXT_PUBLIC_APP_URL: https://undoverse.in
+
+      - name: Compute release tag
+        id: meta
+        run: |
+          tag="v$(date -u +'%Y.%m.%d')-${GITHUB_RUN_NUMBER}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          prev="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+          range="${prev:+${prev}..HEAD}"
+          {
+            echo "changelog<<EOF"
+            git log ${range:-HEAD} --pretty=format:'- %s (%h)' --no-merges
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.meta.outputs.tag }}';
+            const changelog = `${{ steps.meta.outputs.changelog }}`;
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: tag,
+              target_commitish: context.sha,
+              body: [
+                '## undoverse.in production release',
+                '',
+                'Deployed to https://undoverse.in via Vercel.',
+                '',
+                '### Changes',
+                changelog || '- No changes recorded.'
+              ].join('\n'),
+              draft: false,
+              prerelease: false
+            });
+
+      - name: Comment success on commit
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: [
+                '### CI passed — production deployment triggered',
+                '',
+                `Release \`${{ steps.meta.outputs.tag }}\` — commit \`${context.sha.substring(0,7)}\` passed all checks.`,
+                'Vercel is deploying to https://undoverse.in automatically.'
+              ].join('\n')
+            });
+
+      - name: Comment failure on commit
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: [
+                '### CI failed — production deployment blocked',
+                '',
+                `Commit \`${context.sha.substring(0,7)}\` failed CI — not deploying to production.`,
+                `See the run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              ].join('\n')
+            });
+
+      - name: Slack notify on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\":rotating_light: undoverse.in production CI failed (commit ${GITHUB_SHA:0:7}). Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
+            "$SLACK_WEBHOOK_URL"

@@ -1,0 +1,94 @@
+name: PR Preview
+
+# Runs CI checks on every pull request and posts a status comment.
+# Vercel automatically creates preview deployments for PRs via its git integration.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  ci:
+    name: CI checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @undoverse/db generate
+
+      - name: Build
+        run: pnpm turbo build --filter=@undoverse/web
+        env:
+          NEXT_PUBLIC_ROOT_DOMAIN: undoverse.in
+          NEXT_PUBLIC_APP_URL: https://undoverse.in
+
+      - name: Comment CI result on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const success = '${{ job.status }}' === 'success';
+            const marker = '<!-- undoverse-ci -->';
+            const body = [
+              marker,
+              success
+                ? '### CI passed ✅'
+                : '### CI failed ❌',
+              '',
+              success
+                ? `Commit \`${context.sha.substring(0,7)}\` passed typecheck and build. Vercel preview deployment is running.`
+                : `Commit \`${context.sha.substring(0,7)}\` failed CI. [See details](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

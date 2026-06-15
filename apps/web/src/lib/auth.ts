@@ -3,6 +3,23 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
+// Fail fast at module load — catch missing secrets before any auth request lands.
+// In production a missing secret would silently disable auth or expose errors;
+// this surfaces the problem immediately with a clear message.
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.AUTH_GITHUB_ID || !process.env.AUTH_GITHUB_SECRET) {
+    throw new Error(
+      "[auth] AUTH_GITHUB_ID and AUTH_GITHUB_SECRET must be set. " +
+        "Add them in Vercel → Settings → Environment Variables.",
+    );
+  }
+  if (!process.env.AUTH_SECRET) {
+    throw new Error(
+      "[auth] AUTH_SECRET must be set. Generate with: openssl rand -base64 32",
+    );
+  }
+}
+
 /**
  * Auth.js v5 configuration.
  *
