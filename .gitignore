@@ -27,6 +27,7 @@ packages/db/prisma/migrations/dev.db*
 
 # Environment variables
 .env
+.env.local
 .env*.local
 .env.production
 

@@ -31,6 +31,42 @@ export type ProjectDetail = ProjectCardData & {
   }[];
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Shapes of the Prisma rows we read below. Declared explicitly so the
+//  data-access layer type-checks independently of how the generated Prisma
+//  client surfaces its delegate return types in the monorepo build.
+// ─────────────────────────────────────────────────────────────
+type BuilderRow = {
+  role: string;
+  user: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+};
+
+type ChangelogRow = {
+  title: string;
+  description: string;
+  version: string;
+  createdAt: Date;
+};
+
+type ProjectRow = {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  subdomain: string;
+  status: string;
+  repoUrl: string | null;
+  demoUrl: string | null;
+  builders: BuilderRow[];
+  changelogs: ChangelogRow[];
+  _count: { upvotes: number };
+};
+
 const SEED: ProjectDetail[] = [
   {
     slug: "currentundo",
@@ -192,7 +228,7 @@ export async function getProjects(query?: string): Promise<ProjectCardData[]> {
 
     if (rows.length === 0) throw new Error("empty");
 
-    return rows.map((r) => ({
+    return rows.map((r: ProjectRow) => ({
       slug: r.slug,
       name: r.name,
       tagline: r.tagline,
@@ -200,7 +236,7 @@ export async function getProjects(query?: string): Promise<ProjectCardData[]> {
       status: r.status as ProjectStatus,
       upvotes: r._count.upvotes,
       stars: null,
-      builders: r.builders.map((b) => ({
+      builders: r.builders.map((b: BuilderRow) => ({
         username: b.user.username,
         displayName: b.user.displayName,
         avatarUrl: b.user.avatarUrl,
@@ -244,19 +280,19 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
       demoUrl: r.demoUrl,
       upvotes: r._count.upvotes,
       stars: null,
-      builders: r.builders.map((b) => ({
+      builders: r.builders.map((b: BuilderRow) => ({
         username: b.user.username,
         displayName: b.user.displayName,
         avatarUrl: b.user.avatarUrl,
       })),
-      buildersDetailed: r.builders.map((b) => ({
+      buildersDetailed: r.builders.map((b: BuilderRow) => ({
         username: b.user.username,
         displayName: b.user.displayName,
         avatarUrl: b.user.avatarUrl,
         role: b.role as BuilderDetail["role"],
         bio: b.user.bio,
       })),
-      changelog: r.changelogs.map((c) => ({
+      changelog: r.changelogs.map((c: ChangelogRow) => ({
         title: c.title,
         description: c.description,
         version: c.version,

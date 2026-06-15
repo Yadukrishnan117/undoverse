@@ -1,40 +1,70 @@
 /* ─────────────────────────────────────────────────────────────
-   undoverse design tokens
-   The whole visual identity hangs off these custom properties.
-   Bold, minimal, Kerala-dev-pride — indigo + cyan on deep slate.
+   undoverse design tokens — futuristic edition
+   Dark space aesthetic. Kerala dev pride. Ship culture.
+   Indigo + cyan on deep slate. Glassmorphism. Neon glows.
    ───────────────────────────────────────────────────────────── */
 
 :root {
   /* Brand */
-  --brand: #6366f1;          /* indigo-500 — the undo arrow */
-  --brand-fg: #ffffff;       /* text on brand fills */
-  --brand-muted: #818cf8;    /* indigo-400 — hover / secondary */
+  --brand: #6366f1;
+  --brand-fg: #ffffff;
+  --brand-muted: #818cf8;
+  --brand-dim: rgba(99, 102, 241, 0.12);
+  --brand-glow: rgba(99, 102, 241, 0.4);
+  --brand-border: rgba(99, 102, 241, 0.25);
 
-  --accent: #22d3ee;         /* cyan-400 — energy, "redo" */
-  --accent-fg: #06222a;      /* readable on cyan */
+  --accent: #22d3ee;
+  --accent-fg: #06222a;
+  --accent-dim: rgba(34, 211, 238, 0.1);
+  --accent-glow: rgba(34, 211, 238, 0.35);
+  --accent-border: rgba(34, 211, 238, 0.2);
 
-  /* Neutrals — dark-first */
-  --ink: #0f172a;            /* slate-900 — deepest */
-  --surface: #0b1120;        /* page background */
-  --surface-2: #131c31;      /* raised cards */
-  --line: #1e293b;           /* hairline borders (slate-800) */
-  --muted: #94a3b8;          /* slate-400 — secondary text */
-  --fg: #e2e8f0;             /* slate-200 — body text */
-  --fg-strong: #f8fafc;      /* slate-50 — headings */
+  /* Neutrals — deep space */
+  --ink: #0b1120;
+  --surface: #07101f;
+  --surface-2: #0d1a2d;
+  --surface-3: #111f36;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --muted: #64748b;
+  --muted-2: #94a3b8;
+  --fg: #cbd5e1;
+  --fg-strong: #f1f5f9;
 
   /* Status */
-  --ok: #34d399;             /* emerald-400 — ACTIVE */
-  --warn: #fbbf24;           /* amber-400 — UPCOMING */
-  --off: #64748b;            /* slate-500 — ARCHIVED */
-  --danger: #f87171;         /* red-400 — errors */
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --off: #475569;
+  --off-dim: rgba(71, 85, 105, 0.12);
+  --danger: #f87171;
 
-  /* Typography — pure system stack, zero web-font requests */
+  /* Glassmorphism */
+  --glass-bg: rgba(13, 26, 45, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(99, 102, 241, 0.3);
+  --glass-highlight: rgba(255, 255, 255, 0.04);
+
+  /* Gradients */
+  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #22d3ee 100%);
+  --gradient-hero: linear-gradient(135deg, #6366f1 0%, #a78bfa 50%, #22d3ee 100%);
+  --gradient-card: linear-gradient(145deg, rgba(13,26,45,0.9) 0%, rgba(7,16,31,0.95) 100%);
+  --gradient-subtle: linear-gradient(180deg, rgba(99,102,241,0.05) 0%, transparent 100%);
+
+  /* Shadows/Glows */
+  --shadow-brand: 0 0 40px rgba(99, 102, 241, 0.2);
+  --shadow-accent: 0 0 40px rgba(34, 211, 238, 0.15);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 20px 40px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99,102,241,0.2);
+
+  /* Typography */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 
-  /* Spacing scale (rem) */
+  /* Spacing scale */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -49,4 +79,6 @@
   --radius-sm: 0.5rem;
   --radius-md: 0.875rem;
   --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
 }
