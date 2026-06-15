@@ -53,6 +53,7 @@ type ChangelogRow = {
   createdAt: Date;
 };
 
+// Used for list queries (no changelogs included in select)
 type ProjectRow = {
   slug: string;
   name: string;
@@ -63,8 +64,12 @@ type ProjectRow = {
   repoUrl: string | null;
   demoUrl: string | null;
   builders: BuilderRow[];
-  changelogs: ChangelogRow[];
   _count: { upvotes: number };
+};
+
+// Used for single-project queries (changelogs included)
+type ProjectDetailRow = ProjectRow & {
+  changelogs: ChangelogRow[];
 };
 
 const SEED: ProjectDetail[] = [
