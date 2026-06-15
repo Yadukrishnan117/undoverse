@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   // The db & ui packages ship raw TS — let Next transpile them.
   transpilePackages: ["@undoverse/db", "@undoverse/ui"],
