@@ -3,20 +3,25 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
-// Fail fast at module load — catch missing secrets before any auth request lands.
-// In production a missing secret would silently disable auth or expose errors;
-// this surfaces the problem immediately with a clear message.
-if (process.env.NODE_ENV === "production") {
-  if (!process.env.AUTH_GITHUB_ID || !process.env.AUTH_GITHUB_SECRET) {
-    throw new Error(
-      "[auth] AUTH_GITHUB_ID and AUTH_GITHUB_SECRET must be set. " +
-        "Add them in Vercel → Settings → Environment Variables.",
-    );
-  }
-  if (!process.env.AUTH_SECRET) {
-    throw new Error(
-      "[auth] AUTH_SECRET must be set. Generate with: openssl rand -base64 32",
-    );
+// Runtime guard — skipped during `next build` (NEXT_PHASE=phase-production-build).
+// NODE_ENV is "production" at build time too, so a top-level throw would break
+// the Vercel build when auth env vars haven't been added yet.
+function assertAuthEnv() {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.NEXT_PHASE !== "phase-production-build"
+  ) {
+    if (!process.env.AUTH_GITHUB_ID || !process.env.AUTH_GITHUB_SECRET) {
+      throw new Error(
+        "[auth] AUTH_GITHUB_ID and AUTH_GITHUB_SECRET must be set. " +
+          "Add them in Vercel → Settings → Environment Variables.",
+      );
+    }
+    if (!process.env.AUTH_SECRET) {
+      throw new Error(
+        "[auth] AUTH_SECRET must be set. Generate with: openssl rand -base64 32",
+      );
+    }
   }
 }
 
@@ -28,6 +33,9 @@ if (process.env.NODE_ENV === "production") {
  * free. On first sign-in we mirror the GitHub profile onto our User row so the
  * rest of the app can query a stable shape.
  */
+// Call at request time to validate env vars (safe — not called during build).
+assertAuthEnv();
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
   session: { strategy: "jwt" },
